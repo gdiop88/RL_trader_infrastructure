@@ -1,0 +1,63 @@
+
+# Compiled Go binaries
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go test and coverage
+*.out
+coverage/
+coverage.txt
+coverage.html
+
+# Build artifacts
+/build/
+/tmp/
+/.cache/
+
+# Logs
+/logs/
+*.log
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Local configuration
+configs/local.yaml
+configs/*.local.yaml
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Terraform / OpenTofu
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Runtime data
+/data/
+/artifacts/
+/checkpoints/
+
