@@ -1,63 +1,119 @@
 
-# Compiled Go binaries
+# ==========================================
+# Go
+# ==========================================
 /bin/
 /dist/
+/build/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 *.test
-
-# Go test and coverage
 *.out
 coverage/
 coverage.txt
 coverage.html
 
-# Build artifacts
-/build/
+# ==========================================
+# Temporary Files
+# ==========================================
 /tmp/
 /.cache/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
 
+# ==========================================
 # Logs
+# ==========================================
 /logs/
 *.log
 
-# Environment variables and secrets
+# ==========================================
+# Environment & Secrets
+# ==========================================
 .env
 .env.*
 !.env.example
+
 *.pem
 *.key
 *.p12
 *.pfx
 secrets/
+credentials/
 
-# Local configuration
+# ==========================================
+# Local Configuration
+# ==========================================
 configs/local.yaml
 configs/*.local.yaml
+*.local.json
 
-# IDE and editor
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-
+# ==========================================
 # Terraform / OpenTofu
-.terraform/
-.terraform.lock.hcl
+# ==========================================
+**/.terraform/
+**/.tofu/
 *.tfstate
 *.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
 crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 
-# Runtime data
+# Keep dependency lockfiles tracked
+!.terraform.lock.hcl
+
+# ==========================================
+# Ansible
+# ==========================================
+*.retry
+.retry
+
+# ==========================================
+# Runtime Data
+# ==========================================
 /data/
 /artifacts/
 /checkpoints/
+/cache/
 
+# ==========================================
+# Containers
+# ==========================================
+docker-compose.override.yml
+compose.override.yaml
+
+# ==========================================
+# IDE
+# ==========================================
+.idea/
+.vscode/
+
+# ==========================================
+# Operating System
+# ==========================================
+.DS_Store
+Thumbs.db
+
+
+# Project development environment
+/.tools/
+/.cache/
+
+# Local development environment
+
+# Infrastructure server configuration
+!/configs/server.example.yaml

@@ -1,0 +1,75 @@
+
+syntax = "proto3";
+
+package infrastructure.v1;
+
+option go_package = "github.com/gdiop88/RL_trader_infrastructure/api/proto;infrastructurev1";
+
+// Private infrastructure management API.
+// Accessible only to authenticated management clients.
+service InfrastructureService {
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
+  rpc ListInstances(ListInstancesRequest) returns (ListInstancesResponse);
+  rpc GetOperation(GetOperationRequest) returns (GetOperationResponse);
+}
+
+// Service status
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  string service = 1;
+  string version = 2;
+  string environment = 3;
+  string status = 4;
+  string provisioning_engine = 5;
+}
+
+// Cloud providers
+
+message ListProvidersRequest {}
+
+message Provider {
+  string name = 1;
+  bool enabled = 2;
+  string status = 3;
+}
+
+message ListProvidersResponse {
+  repeated Provider providers = 1;
+}
+
+// Cloud instances
+
+message ListInstancesRequest {
+  string provider = 1;
+}
+
+message Instance {
+  string id = 1;
+  string provider = 2;
+  string region = 3;
+  string instance_type = 4;
+  string status = 5;
+  string public_ip = 6;
+  string private_ip = 7;
+}
+
+message ListInstancesResponse {
+  repeated Instance instances = 1;
+}
+
+// Asynchronous provisioning operations
+
+message GetOperationRequest {
+  string operation_id = 1;
+}
+
+message GetOperationResponse {
+  string operation_id = 1;
+  string type = 2;
+  string status = 3;
+  string resource_id = 4;
+  string error_message = 5;
+}

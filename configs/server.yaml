@@ -1,0 +1,46 @@
+
+service:
+  name: infrastructure
+  environment: development
+  shutdown_timeout: 30s
+
+server:
+  grpc:
+    enabled: false
+    address: 127.0.0.1
+    port: 50051
+
+  tls:
+    enabled: true
+    cert_file: /etc/infrastructure/certs/server.crt
+    key_file: /etc/infrastructure/certs/server.key
+    client_ca: /etc/infrastructure/certs/ca.crt
+    client_auth: true
+
+database:
+  driver: postgres
+  host: pg-220f2f73-pg-220f2f73.f.aivencloud.com
+  port: 28488
+  name: defaultdb
+  user: avnadmin
+  password: "REPLACE_WITH_AIVEN_PASSWORD"
+  sslmode: verify-full
+  sslrootcert: /etc/infrastructure/certs/aiven-ca.pem
+
+secrets:
+  provider: none
+  address: ""
+
+provisioning:
+  engine: opentofu
+  max_concurrent_operations: 5
+
+providers:
+  digitalocean:
+    enabled: false
+  aws:
+    enabled: false
+
+logging:
+  level: info
+  format: json
