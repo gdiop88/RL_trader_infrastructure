@@ -145,7 +145,7 @@ jobs:
               chmod 600 /var/lib/postgresql/server.key
             '
 
-          docker exec \
+          docker exec --user postgres \
             "${{ job.services.postgres.id }}" \
             sh -c '
               echo "ssl = on" >> "$PGDATA/postgresql.conf"
