@@ -1,7 +1,6 @@
-
 {
   "branches": [
-    "main"
+    "production"
   ],
   "tagFormat": "v${version}",
   "plugins": [
@@ -46,4 +45,3 @@
     "@semantic-release/github"
   ]
 }
-

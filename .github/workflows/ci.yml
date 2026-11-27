@@ -1,0 +1,108 @@
+name: Infrastructure CI
+
+on:
+  push:
+    branches:
+      - development
+      - staging
+      - production
+  pull_request:
+    branches:
+      - development
+      - staging
+      - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-validation:
+    name: Go Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Verify formatting
+        run: |
+          files="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$files" ]; then
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Static analysis
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Unit tests
+        run: |
+          go test \
+            ./tests/unit/... \
+            ./internal/... \
+            ./cmd/... \
+            ./api/... \
+            -count=1
+
+      - name: Dependency vulnerability check
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  integration-validation:
+    name: Integration Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: infrastructure
+          POSTGRES_PASSWORD: integration_test_only
+          POSTGRES_DB: infrastructure
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U infrastructure -d infrastructure"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: infrastructure
+      DATABASE_USER: infrastructure
+      DATABASE_PASSWORD: integration_test_only
+      DATABASE_SSLMODE: disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run integration tests
+        run: |
+          go test ./tests/integration/... -count=1 -v

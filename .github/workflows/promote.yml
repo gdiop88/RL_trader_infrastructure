@@ -1,0 +1,54 @@
+name: Environment Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  promote:
+    name: Create Promotion PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ inputs.target }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$TARGET" = "staging" ]; then
+            SOURCE="development"
+          else
+            SOURCE="staging"
+          fi
+
+          existing="$(gh pr list \
+            --repo "$REPO" \
+            --base "$TARGET" \
+            --head "$SOURCE" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$existing" ]; then
+            echo "Promotion PR already exists: #$existing"
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "$REPO" \
+            --base "$TARGET" \
+            --head "$SOURCE" \
+            --title "chore: promote $SOURCE to $TARGET" \
+            --body "Automated environment promotion. Merge after required CI checks pass."
