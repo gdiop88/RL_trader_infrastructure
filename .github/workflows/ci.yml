@@ -1,0 +1,191 @@
+name: Infrastructure CI
+
+on:
+  push:
+    branches:
+      - development
+      - staging
+      - production
+  pull_request:
+    branches:
+      - development
+      - staging
+      - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-validation:
+    name: Go Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.4'
+          cache: true
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Check formatting
+        run: |
+          files="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$files" ]; then
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Static analysis
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Unit tests
+        run: |
+          go test \
+            ./tests/unit/... \
+            ./internal/... \
+            ./cmd/... \
+            ./api/... \
+            -count=1
+
+      - name: Vulnerability scanning
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  integration-validation:
+    name: Integration Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: infrastructure
+          POSTGRES_PASSWORD: integration_test_only
+          POSTGRES_DB: infrastructure
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U infrastructure -d infrastructure"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.4'
+          cache: true
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Generate test certificates
+        run: |
+          mkdir -p /tmp/infrastructure-ci/certs
+
+          openssl req -x509 -newkey rsa:2048 \
+            -nodes \
+            -keyout /tmp/infrastructure-ci/certs/ca.key \
+            -out /tmp/infrastructure-ci/certs/ca.crt \
+            -days 1 \
+            -subj "/CN=Infrastructure CI CA"
+
+          openssl req -newkey rsa:2048 \
+            -nodes \
+            -keyout /tmp/infrastructure-ci/certs/server.key \
+            -out /tmp/infrastructure-ci/certs/server.csr \
+            -subj "/CN=localhost"
+
+          cat > /tmp/infrastructure-ci/certs/server.ext <<'EOF'
+          subjectAltName=DNS:localhost,IP:127.0.0.1
+          extendedKeyUsage=serverAuth
+          EOF
+
+          openssl x509 -req \
+            -in /tmp/infrastructure-ci/certs/server.csr \
+            -CA /tmp/infrastructure-ci/certs/ca.crt \
+            -CAkey /tmp/infrastructure-ci/certs/ca.key \
+            -CAcreateserial \
+            -out /tmp/infrastructure-ci/certs/server.crt \
+            -days 1 \
+            -extfile /tmp/infrastructure-ci/certs/server.ext
+
+      - name: Configure isolated PostgreSQL TLS
+        run: |
+          docker cp \
+            /tmp/infrastructure-ci/certs/server.crt \
+            "${{ job.services.postgres.id }}:/tmp/server.crt"
+
+          docker cp \
+            /tmp/infrastructure-ci/certs/server.key \
+            "${{ job.services.postgres.id }}:/tmp/server.key"
+
+          docker exec --user root \
+            "${{ job.services.postgres.id }}" \
+            sh -c '
+              cp /tmp/server.crt /var/lib/postgresql/server.crt
+              cp /tmp/server.key /var/lib/postgresql/server.key
+              chown postgres:postgres /var/lib/postgresql/server.*
+              chmod 600 /var/lib/postgresql/server.key
+            '
+
+          docker exec --user postgres \
+            "${{ job.services.postgres.id }}" \
+            sh -c '
+              echo "ssl = on" >> "$PGDATA/postgresql.conf"
+              echo "ssl_cert_file = '\''/var/lib/postgresql/server.crt'\''" >> "$PGDATA/postgresql.conf"
+              echo "ssl_key_file = '\''/var/lib/postgresql/server.key'\''" >> "$PGDATA/postgresql.conf"
+              pg_ctl reload -D "$PGDATA"
+            '
+
+      - name: Generate CI database configuration
+        run: |
+          python3 - <<'PY'
+          import yaml
+
+          with open("configs/server.yaml") as f:
+              cfg = yaml.safe_load(f)
+
+          cfg["service"]["environment"] = "test"
+          cfg["server"]["grpc"]["enabled"] = False
+
+          cfg["database"] = {
+              "driver": "postgres",
+              "host": "localhost",
+              "port": 5432,
+              "name": "infrastructure",
+              "user": "infrastructure",
+              "password": "integration_test_only",
+              "sslmode": "verify-full",
+              "sslrootcert": "/tmp/infrastructure-ci/certs/ca.crt",
+          }
+
+          with open("configs/server.yaml", "w") as f:
+              yaml.safe_dump(cfg, f)
+          PY
+
+      - name: Apply database migrations
+        run: |
+          go run ./cmd/migrate \
+            -action up \
+            -config configs/server.yaml \
+            -migrations migrations
+
+      - name: Run integration tests
+        run: go test ./tests/integration/... -count=1 -v

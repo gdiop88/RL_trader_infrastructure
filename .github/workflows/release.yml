@@ -1,25 +1,27 @@
-
-name: Automatic Release
+name: Automatic Production Release
 
 on:
   push:
     branches:
-      - main
+      - production
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 concurrency:
-  group: release
+  group: production-release
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Semantic Versioning and Release
+    name: Semantic Versioning and GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -39,8 +41,7 @@ jobs:
             @semantic-release/github@12 \
             conventional-changelog-conventionalcommits@9
 
-      - name: Publish release
+      - name: Publish production release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
-
